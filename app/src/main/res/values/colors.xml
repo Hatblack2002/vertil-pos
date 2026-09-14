@@ -1,0 +1,17 @@
+<resources>
+    <!-- Paleta VERTIL POS: oscuro comercial con acento esmeralda/oro -->
+    <color name="vp_bg">#0A1014</color>
+    <color name="vp_bg_gradient">#102025</color>
+    <color name="vp_surface">#162026</color>
+    <color name="vp_surface_variant">#1F2E36</color>
+    <color name="vp_primary">#10B981</color>
+    <color name="vp_primary_variant">#34D399</color>
+    <color name="vp_secondary">#F59E0B</color>
+    <color name="vp_on_bg">#E8F0F2</color>
+    <color name="vp_on_surface">#B5C7CC</color>
+    <color name="vp_on_surface_muted">#6B7E83</color>
+    <color name="vp_outline">#243440</color>
+    <color name="vp_error">#EF4444</color>
+    <color name="vp_warning">#F59E0B</color>
+    <color name="vp_splash_bg">#0A1014</color>
+</resources>

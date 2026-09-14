@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.vertil.pos.app-mergeDebugResources-71:/values-v31/values-v31.xml",
+            "map": [
+                {
+                    "source": "/home/z/.gradle/caches/8.9/transforms/daca486c4c030874fa0f4f4898ed946e/transformed/core-splashscreen-1.0.1/res/values-v31/values-v31.xml",
+                    "from": {
+                        "startLines": "2,9",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,473",
+                        "endLines": "8,13",
+                        "endColumns": "12,12",
+                        "endOffsets": "468,697"
+                    }
+                }
+            ]
+        }
+    ]
+}

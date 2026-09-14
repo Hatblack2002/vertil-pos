@@ -1,0 +1,15 @@
+# VERTIL POS — ProGuard
+-keep class androidx.room.** { *; }
+-keep class * extends androidx.room.RoomDatabase { *; }
+-keep @androidx.room.Entity class * { *; }
+-keepclassmembers class * { @androidx.room.* <methods>; }
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
+-keep class org.mindrot.jbcrypt.** { *; }
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
+-keepclasseswithmembers class kotlinx.serialization.json.** { kotlinx.serialization.KSerializer serializer(...); }
+-keep class com.vertil.pos.core.** { *; }
+-keep class com.vertil.pos.data.entity.** { *; }
+-keepclassmembers enum * { public static **[] values(); public static ** valueOf(java.lang.String); }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.vertil.pos.core.MoneyTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-09-14T03:34:18" hostname="c-6aa75497-14d96228-a9c1a7f8dcd1" time="0.017">
+  <properties/>
+  <testcase name="arithmetic is exact" classname="com.vertil.pos.core.MoneyTest" time="0.001"/>
+  <testcase name="parse handles dot and comma" classname="com.vertil.pos.core.MoneyTest" time="0.005"/>
+  <testcase name="negative amounts" classname="com.vertil.pos.core.MoneyTest" time="0.007"/>
+  <testcase name="formatting cents to display" classname="com.vertil.pos.core.MoneyTest" time="0.001"/>
+  <testcase name="percent calculation rounds half up" classname="com.vertil.pos.core.MoneyTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

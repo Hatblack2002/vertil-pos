@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.vertil.pos.core.InventoryEngineTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-09-14T03:34:18" hostname="c-6aa75497-14d96228-a9c1a7f8dcd1" time="0.04">
+  <properties/>
+  <testcase name="isLowStock false when above minimum" classname="com.vertil.pos.core.InventoryEngineTest" time="0.003"/>
+  <testcase name="validateMovement passes when enough stock" classname="com.vertil.pos.core.InventoryEngineTest" time="0.001"/>
+  <testcase name="validateMovement fails on zero quantity" classname="com.vertil.pos.core.InventoryEngineTest" time="0.001"/>
+  <testcase name="RETURN increases stock" classname="com.vertil.pos.core.InventoryEngineTest" time="0.0"/>
+  <testcase name="SALE reduces stock" classname="com.vertil.pos.core.InventoryEngineTest" time="0.0"/>
+  <testcase name="isLowStock when stock equals minimum" classname="com.vertil.pos.core.InventoryEngineTest" time="0.0"/>
+  <testcase name="PURCHASE increases stock" classname="com.vertil.pos.core.InventoryEngineTest" time="0.0"/>
+  <testcase name="validateMovement fails when stock would go negative" classname="com.vertil.pos.core.InventoryEngineTest" time="0.033"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
