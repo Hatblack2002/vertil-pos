@@ -11,12 +11,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vertil.pos.core.engine.SaleService
 import com.vertil.pos.core.money.Money
+import com.vertil.pos.security.Permission
 import com.vertil.pos.ui.PosViewModel
 import com.vertil.pos.ui.theme.VpPrimary
 import com.vertil.pos.ui.theme.VpSecondary
@@ -24,9 +24,11 @@ import com.vertil.pos.ui.theme.VpSecondary
 @Composable
 fun PosScreen(vm: PosViewModel, onScan: () -> Unit, contentPadding: PaddingValues = PaddingValues()) {
     val state by vm.pos.collectAsState()
+    val home by vm.home.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var showCheckout by remember { mutableStateOf(false) }
     var receivedInput by remember { mutableStateOf("") }
+    var editingCartItem by remember { mutableStateOf<com.vertil.pos.core.engine.CartItem?>(null) }
 
     Column(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(contentPadding)
@@ -34,29 +36,29 @@ fun PosScreen(vm: PosViewModel, onScan: () -> Unit, contentPadding: PaddingValue
         // Top bar
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("POS", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            if (vm.hasPermission(com.vertil.pos.security.Permission.CASH_VIEW)) {
-                Text(if (vm.home.collectAsState().value.cashOpen) "CAJA ABIERTA" else "CAJA CERRADA",
-                    color = if (vm.home.collectAsState().value.cashOpen) VpPrimary else MaterialTheme.colorScheme.error,
+            if (vm.hasPermission(Permission.CASH_VIEW)) {
+                Text(if (home.cashOpen) "CAJA ABIERTA" else "CAJA CERRADA",
+                    color = if (home.cashOpen) VpPrimary else MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelMedium)
             }
         }
 
-        // Scan + search row
+        // Scan + search row — botón de escaneo GRANDE y accesible
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Button(
                 onClick = onScan,
-                modifier = Modifier.weight(0.4f).height(56.dp),
+                modifier = Modifier.weight(0.45f).height(64.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = VpPrimary, contentColor = Color.Black)
             ) {
-                Icon(Icons.Filled.CenterFocusStrong, contentDescription = null)
+                Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Escanear", fontWeight = FontWeight.SemiBold)
+                Text("Escanear", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
             }
             Spacer(Modifier.width(12.dp))
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                modifier = Modifier.weight(0.6f),
+                modifier = Modifier.weight(0.55f),
                 placeholder = { Text("Buscar producto…") },
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
@@ -82,12 +84,25 @@ fun PosScreen(vm: PosViewModel, onScan: () -> Unit, contentPadding: PaddingValue
             // Cart list
             if (state.cart.isEmpty()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("El carrito está vacío\nEscanear o buscar producto", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Filled.ShoppingCart, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(56.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text("Carrito vacío", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Escanea un producto o búscalo arriba", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             } else {
                 LazyColumn(modifier = Modifier.weight(1f).padding(8.dp)) {
                     items(state.cart) { item ->
-                        CartItemRow(item, onAdd = { vm.updateQuantity(item.productId, 1.0) }, onSub = { vm.updateQuantity(item.productId, -1.0) }, onRemove = { vm.removeFromCart(item.productId) })
+                        CartItemRow(
+                            item = item,
+                            canEditPrice = vm.hasPermission(Permission.PRODUCTS_EDIT),
+                            onAdd = { vm.updateQuantity(item.productId, 1.0) },
+                            onSub = { vm.updateQuantity(item.productId, -1.0) },
+                            onRemove = { vm.removeFromCart(item.productId) },
+                            onEditPrice = { editingCartItem = item }
+                        )
                     }
                 }
             }
@@ -130,7 +145,7 @@ fun PosScreen(vm: PosViewModel, onScan: () -> Unit, contentPadding: PaddingValue
         ) { Text("COBRAR ${state.calculation.total.format()}", fontWeight = FontWeight.Bold) }
     }
 
-    // Checkout dialog
+    // === Checkout dialog ===
     if (showCheckout) {
         val total = state.calculation.total
         val received = Money.parse(receivedInput) ?: Money.ZERO
@@ -180,27 +195,63 @@ fun PosScreen(vm: PosViewModel, onScan: () -> Unit, contentPadding: PaddingValue
         )
     }
 
-    // Snackbar
-    state.snackbar?.let {
-        LaunchedEffect(it) {
-            // Show via host — MainActivity handles
-        }
+    // === Editar precio del item en carrito ===
+    editingCartItem?.let { item ->
+        EditCartItemPriceDialog(
+            productName = item.name,
+            currentPriceCents = item.unitPrice.cents,
+            onDismiss = { editingCartItem = null },
+            onConfirm = { newCents ->
+                vm.updateCartItemPrice(item.productId, newCents)
+                editingCartItem = null
+            }
+        )
     }
 }
 
 @Composable
-private fun CartItemRow(item: com.vertil.pos.core.engine.CartItem, onAdd: () -> Unit, onSub: () -> Unit, onRemove: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(item.name, color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
-                Text("${item.unitPrice.format()} c/u · stock: ${item.stockAvailable}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+private fun CartItemRow(
+    item: com.vertil.pos.core.engine.CartItem,
+    canEditPrice: Boolean,
+    onAdd: () -> Unit,
+    onSub: () -> Unit,
+    onRemove: () -> Unit,
+    onEditPrice: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(item.name, color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+                    Text(
+                        "${item.unitPrice.format()} c/u · stock: ${item.stockAvailable}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                IconButton(onClick = onSub) { Icon(Icons.Filled.Remove, contentDescription = "Restar", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Text("${item.quantity.toInt()}", color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.titleMedium)
+                IconButton(onClick = onAdd) { Icon(Icons.Filled.Add, contentDescription = "Sumar", tint = VpPrimary) }
+                Text(item.subtotal.format(), color = VpPrimary, modifier = Modifier.padding(horizontal = 8.dp), fontWeight = FontWeight.Bold)
+                IconButton(onClick = onRemove) { Icon(Icons.Filled.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error) }
             }
-            IconButton(onClick = onSub) { Icon(Icons.Filled.Remove, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Text("${item.quantity.toInt()}", color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.titleMedium)
-            IconButton(onClick = onAdd) { Icon(Icons.Filled.Add, contentDescription = null, tint = VpPrimary) }
-            Text(item.subtotal.format(), color = VpPrimary, modifier = Modifier.padding(horizontal = 8.dp), fontWeight = FontWeight.Bold)
-            IconButton(onClick = onRemove) { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
+            // Fila de acciones: editar precio (carrito y DB)
+            if (canEditPrice) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onEditPrice) {
+                        Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Editar precio (esta venta)", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
         }
     }
 }

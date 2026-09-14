@@ -17,6 +17,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.util.UUID
+
+/**
+ * Resultado estructurado de un escaneo individual.
+ * Sirve para mostrar feedback en vivo en la pantalla del escáner.
+ */
+data class ScanResult(
+    val id: String = UUID.randomUUID().toString(),
+    val code: String,
+    val format: String = "",
+    val productName: String?,
+    val priceFormatted: String?,
+    val addedToCart: Boolean,
+    val error: String? = null
+)
 
 data class PosUiState(
     val cart: List<CartItem> = emptyList(),
@@ -217,18 +232,91 @@ class PosViewModel : ViewModel() {
 
     /**
      * Busca producto por código de barras (vía escáner) y lo agrega al carrito.
-     * Si no existe, muestra snackbar con opción de crear.
+     * Devuelve un [ScanResult] estructurado para que la UI del escáner muestre
+     * feedback en vivo (producto encontrado / no encontrado / precio).
+     *
+     * Si el producto no existe, el caller puede decidir abrir el diálogo de creación.
      */
-    fun addToCartByBarcode(code: String) {
-        viewModelScope.launch {
-            val p = db.productDao().getByBarcode(code)
-            if (p != null) {
-                addToCart(p)
-                _pos.value = _pos.value.copy(snackbar = "Agregado: ${p.name}")
-            } else {
-                _pos.value = _pos.value.copy(
-                    snackbar = "Producto no encontrado para código $code"
+    fun addToCartByBarcode(code: String, format: String = ""): ScanResult {
+        // Esta función es sincrónica porque se llama desde el callback del escáner
+        // y necesitamos el resultado inmediato. La búsqueda DB se hace en runBlocking
+        // para evitar que el callback vuelva antes de tener el producto.
+        return kotlinx.coroutines.runBlocking {
+            try {
+                val p = db.productDao().getByBarcode(code)
+                if (p != null) {
+                    addToCart(p)
+                    _pos.value = _pos.value.copy(snackbar = "Agregado: ${p.name}")
+                    ScanResult(
+                        code = code,
+                        format = format,
+                        productName = p.name,
+                        priceFormatted = Money.ofCents(p.salePriceCents).format(),
+                        addedToCart = true
+                    )
+                } else {
+                    ScanResult(
+                        code = code,
+                        format = format,
+                        productName = null,
+                        priceFormatted = null,
+                        addedToCart = false,
+                        error = "Producto no encontrado"
+                    )
+                }
+            } catch (t: Throwable) {
+                ScanResult(
+                    code = code,
+                    format = format,
+                    productName = null,
+                    priceFormatted = null,
+                    addedToCart = false,
+                    error = t.message
                 )
+            }
+        }
+    }
+
+    /**
+     * Actualiza el precio unitario de un item en el carrito.
+     * No persiste en DB — solo afecta esta venta.
+     */
+    fun updateCartItemPrice(productId: Long, newPriceCents: Long) {
+        val current = _pos.value.cart.toMutableList()
+        val item = current.firstOrNull { it.productId == productId } ?: return
+        val newPrice = Money.ofCents(newPriceCents)
+        current.remove(item)
+        current.add(item.copy(unitPrice = newPrice))
+        recalculate(current)
+        _pos.value = _pos.value.copy(snackbar = "Precio actualizado: ${item.name} → ${newPrice.format()}")
+    }
+
+    /**
+     * Persiste un nuevo precio de venta para un producto en la DB.
+     * Solo ADMIN y MANAGER pueden hacerlo.
+     * A partir de la próxima vez que se escanee el producto, el precio será el nuevo.
+     */
+    fun updateProductPriceInDb(productId: Long, newSalePriceCents: Long) {
+        if (!hasPermission(Permission.PRODUCTS_EDIT)) {
+            _pos.value = _pos.value.copy(snackbar = "Sin permiso para editar productos")
+            return
+        }
+        viewModelScope.launch {
+            val p = db.productDao().getById(productId) ?: return@launch
+            db.productDao().update(p.copy(
+                salePriceCents = newSalePriceCents,
+                updatedAt = System.currentTimeMillis()
+            ))
+            ServiceLocator.audit.log("PRODUCT_PRICE_UPDATED", "Product", productId.toString(), mapOf(
+                "oldPrice" to Money.ofCents(p.salePriceCents).format(),
+                "newPrice" to Money.ofCents(newSalePriceCents).format()
+            ))
+            // También actualizar el item en el carrito si está presente
+            val cartItem = _pos.value.cart.firstOrNull { it.productId == productId }
+            if (cartItem != null) {
+                updateCartItemPrice(productId, newSalePriceCents)
+            } else {
+                _pos.value = _pos.value.copy(snackbar = "Precio del producto actualizado: ${Money.ofCents(newSalePriceCents).format()}")
             }
         }
     }

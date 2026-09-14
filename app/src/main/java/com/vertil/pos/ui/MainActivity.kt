@@ -50,8 +50,10 @@ private fun RootScreen(vm: PosViewModel = viewModel()) {
     val loggedIn by vm.loginState.collectAsState()
     var tab by remember { mutableStateOf(Tab.HOME) }
     var showScanner by remember { mutableStateOf(false) }
+    var pendingBarcodeForCreation by remember { mutableStateOf<String?>(null) }
     val snackbarHost = remember { SnackbarHostState() }
 
+    // Mostrar snackbar desde el VM
     LaunchedEffect(vm.pos.collectAsState().value.snackbar) {
         vm.pos.value.snackbar?.let { snackbarHost.showSnackbar(it); vm.consumeSnack() }
     }
@@ -65,15 +67,32 @@ private fun RootScreen(vm: PosViewModel = viewModel()) {
         return
     }
 
-    // Scanner overlay
+    // === Pantalla del escáner (overlay completo) ===
     if (showScanner) {
         ScannerScreen(
             onBarcodeDetected = { code ->
-                // Buscar producto por barcode y agregar al carrito
                 vm.addToCartByBarcode(code)
             },
-            onBack = { showScanner = false }
+            onCreateProductForBarcode = { code ->
+                // Abrir diálogo de creación
+                pendingBarcodeForCreation = code
+            },
+            onClose = { showScanner = false }
         )
+        // Si hay un barcode pendiente de creación, mostrar diálogo encima del escáner
+        pendingBarcodeForCreation?.let { barcode ->
+            CreateProductFromBarcodeDialog(
+                barcode = barcode,
+                onDismiss = { pendingBarcodeForCreation = null },
+                onCreate = { product ->
+                    vm.createProduct(product) { newId ->
+                        // Tras crear el producto, agregarlo al carrito
+                        vm.addToCartByBarcode(barcode)
+                        pendingBarcodeForCreation = null
+                    }
+                }
+            )
+        }
         return
     }
 

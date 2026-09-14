@@ -1,3 +1,9 @@
 *.apk *.aab *.dex *.class bin/ gen/ out/ release/ .gradle/ build/ local.properties
 *.log .navigation/ captures/ *.iml .idea/ *.ipr *.iws *.jks *.keystore
 .externalNativeBuild .cxx/ .DS_Store Thumbs.db .env *.token secrets.properties
+
+# Build artifacts (v1.0.1)
+.gradle/
+local.properties
+app/build/
+build/
